@@ -1,4 +1,4 @@
-<h2 align="center"> REDES NEURAIS E ALGORITMOS GENÉTICOS </h2>
+<h2 align="center"> PeQDs Morphology Analysis </h2>
 
 <p align="center"><img src="https://github.com/gabrielxvr/PeQDs-morphology-analysis/assets/106620307/88f467e8-48fd-4fa9-8e29-710ac231c8f0"></p>
 
