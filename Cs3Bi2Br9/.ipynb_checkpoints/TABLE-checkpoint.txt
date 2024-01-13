@@ -1,0 +1,2 @@
+Et_bulk Ef_bluk Eg_bulk    ##### Energia total, Energia de Fermi, bandgap  eV
+-66675.533 3.757  2.536
