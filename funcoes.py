@@ -108,6 +108,8 @@ def print_POSCAR(df_atoms, lat):
     Takes a dataframe of atomic positions and a list of lattice vectors and
     prints it in the format of VASP POSCAR input file.
     """
+    # ADD VACUUM:
+    lat[2][2] = str(float(lat[2][2]) + max(df_atoms['Z(ANGSTROM)']) + 15)
     for k in lat:
         print('   '+ '    '.join([format(float(b), '.15f')[:15] for b in k]))
     species = sorted(set(df_atoms['atom_species']), key=list(df_atoms['atom_species']).index)
@@ -134,6 +136,8 @@ def print_QE(df_atoms, lat):
     Takes a dataframe of atomic positions and a list of lattice vectors and
     prints it in the format of Quantum Espresso input file.
     """
+    # ADD VACUUM:
+    lat[2][2] = str(float(lat[2][2]) + max(df_atoms['Z(ANGSTROM)']) + 15)
     print("CELL_PARAMETERS (alat=  1.889725989)")
     for k in lat:
         print('   '+ '   '.join([format(float(b), '.15f')[:15] for b in k]))
