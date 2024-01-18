@@ -165,3 +165,87 @@ def convert_crystal_data(file_name, QE = False):
     else:
         print_QE(df_atoms,lat)
     return df_atoms
+
+##############################################################################
+# Functions to read relax output and create scf inputs. #
+##############################################################################
+
+def read_relax(file_path_rr):
+    """ 
+    Reads the relax.out file and outpus a string of atomic position
+    """
+    file_name = 'relax.out'
+    file_path_rr = file_path_rr + file_name
+    with open(file_path_rr, 'r') as file:
+        lines = file.readlines()
+    start_index = lines.index('Begin final coordinates\n') + 2
+    atomic_positions = ''.join(lines[start_index:start_index+16])
+    return atomic_positions
+
+def read_cell_parameters(file_path_rcp):
+    """ 
+    Reads the relax.in file and outpus a string of cell parameters
+    """
+    file_name = 'relax.in'
+    file_path_rcp = file_path_rcp + file_name
+    with open(file_path_rcp, 'r') as file:
+        lines = file.readlines()
+    start_index = lines.index('''CELL_PARAMETERS 'angstrom'\n''')
+    cell_parameters = ''.join(lines[start_index:start_index+4])
+    return cell_parameters
+    
+
+
+def save_scf(file_path_ss, atomic_positions, cell_parameters):
+    content = """&CONTROL
+    calculation   = 'scf',
+    verbosity='high',
+    restart_mode  = 'from_scratch',
+    nstep         =  200
+    pseudo_dir = './'
+    prefix='out',
+    tstress = .true.,
+    tprnfor = .true.,
+ /
+&SYSTEM
+    ibrav = 0,
+    nat= 15,
+    ntyp= 3,
+    ecutwfc     = 30.0 ,
+    ecutrho     = 300.0 ,
+    nspin = 1 ,
+    degauss = 0.01 ,
+    occupations='smearing',
+ /
+&ELECTRONS
+    electron_maxstep  = 500
+    conv_thr          = 1.0e-6
+    mixing_mode       = 'plain'
+    mixing_beta       = 0.3
+    diagonalization   = 'david'
+ /
+&IONS
+    ion_dynamics      = 'bfgs'
+    ion_positions     = 'default '
+ /
+ &cell
+    cell_dynamics='bfgs',
+    press=0.0,
+    press_conv_thr=0.5,
+/
+ATOMIC_SPECIES
+ Cs     132.905 Cs.upf
+ Pb     207.200 Pb.upf
+ Br     79.904  Br.upf
+K_POINTS {automatic}
+4 4 1 0 0 0
+"""
+    
+    scf_text = content + cell_parameters + atomic_positions
+
+    file_path_ss = file_path_ss + "scf.in"
+
+    with open(file_path_ss, "w") as file:
+        file.write(scf_text)
+
+    print(f'The content has been saved to {file_path_ss}/scf.in.')
