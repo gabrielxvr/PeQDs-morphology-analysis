@@ -166,25 +166,27 @@ def convert_crystal_data(file_name, QE = False):
         print_QE(df_atoms,lat)
     return df_atoms
 
-##############################################################################
+#########################################################
 # Functions to read relax output and create scf inputs. #
-##############################################################################
+#########################################################
 
 def read_relax(file_path_rr):
     """ 
-    Reads the relax.out file and outpus a string of atomic position
+    Reads the relax.out file and outpus a string of cell parameters and atomic position
     """
     file_name = 'relax.out'
     file_path_rr = file_path_rr + file_name
     with open(file_path_rr, 'r') as file:
         lines = file.readlines()
     start_index = lines.index('Begin final coordinates\n') + 2
-    atomic_positions = ''.join(lines[start_index:start_index+16])
-    return atomic_positions
+    final_index = lines.index('End final coordinates\n')
+    atomic_positions = ''.join(lines[start_index:final_index])
+    n_atoms = final_index - start_index - 1
+    return n_atoms, atomic_positions
 
 def read_cell_parameters(file_path_rcp):
     """ 
-    Reads the relax.in file and outpus a string of cell parameters
+    Reads the relax.out file and outpus a string of cell parameters and atomic position
     """
     file_name = 'relax.in'
     file_path_rcp = file_path_rcp + file_name
@@ -196,7 +198,7 @@ def read_cell_parameters(file_path_rcp):
     
 
 
-def save_scf(file_path_ss, atomic_positions, cell_parameters):
+def save_scf(file_path_ss, n_atoms, atomic_positions, cell_parameters):
     content = """&CONTROL
     calculation   = 'scf',
     verbosity='high',
@@ -209,7 +211,8 @@ def save_scf(file_path_ss, atomic_positions, cell_parameters):
  /
 &SYSTEM
     ibrav = 0,
-    nat= 15,
+    nat= {"""
+    content2 = """},
     ntyp= 3,
     ecutwfc     = 30.0 ,
     ecutrho     = 300.0 ,
@@ -240,12 +243,11 @@ ATOMIC_SPECIES
 K_POINTS {automatic}
 4 4 1 0 0 0
 """
-    
-    scf_text = content + cell_parameters + atomic_positions
+    scf_text = content + str(n_atoms) + content2 + cell_parameters + atomic_positions
 
     file_path_ss = file_path_ss + "scf.in"
 
     with open(file_path_ss, "w") as file:
         file.write(scf_text)
 
-    print(f'The content has been saved to {file_path_ss}/scf.in.')
+    print(f'The content has been saved to {file_path_ss}.')
