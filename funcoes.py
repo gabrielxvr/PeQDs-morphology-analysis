@@ -103,7 +103,7 @@ def zero_xyz(df_atoms):
     return df_atoms
 
 
-def print_POSCAR(df_atoms, lat):
+def print_POSCAR(df_atoms, lat, FROZEN_LAYERS):
     """
     Takes a dataframe of atomic positions and a list of lattice vectors and
     prints it in the format of VASP POSCAR input file.
@@ -120,6 +120,9 @@ def print_POSCAR(df_atoms, lat):
     for i in range(len(quant)):
         quant[i] = str(quant[i])
     print(' '.join(quant))
+    
+    if bool(FROZEN_LAYERS):
+        print('Selective dynamics')
     print('direct')
 
     for i in range(len(df_atoms['Z(ANGSTROM)'])):
@@ -127,11 +130,15 @@ def print_POSCAR(df_atoms, lat):
         for j in range(len(pos)):
             pos[j] = format(pos[j], '.15f')
             pos[j] = pos[j][:15]
-        line = '   ' + '   '.join(map(str, pos)) + ' ' + df_atoms['atom_species'][i]
+        froz = str(bool(df_atoms['FX'][i]))[0] + str(bool(df_atoms['FY'][i]))[0] + str(bool(df_atoms['FZ'][i]))[0]
+        if bool(FROZEN_LAYERS):
+            line = '   ' + '   '.join(map(str, pos)) + ' ' + '   ' + froz[0] + '   ' + froz[1] + '   ' + froz[2]
+        else:
+            line = '   ' + '   '.join(map(str, pos)) + ' ' + df_atoms['atom_species'][i]
         print(line)
 
 
-def print_QE(df_atoms, lat):
+def print_QE(df_atoms, lat, FROZEN_LAYERS):
     """
     Takes a dataframe of atomic positions and a list of lattice vectors and
     prints it in the format of Quantum Espresso input file.
@@ -148,22 +155,50 @@ def print_QE(df_atoms, lat):
         for j in range(len(pos)):
             pos[j] = format(pos[j], '.15f')
             pos[j] = pos[j][:15]
-        line = df_atoms['atom_species'][i]+'   ' + '   '.join(map(str, pos))
+        froz = str(df_atoms['FX'][i]) + str(df_atoms['FY'][i]) + str(df_atoms['FZ'][i])
+        if bool(FROZEN_LAYERS):
+            line = df_atoms['atom_species'][i]+'   ' + '   '.join(map(str, pos)) + '   ' + froz[0] + '   ' + froz[1] + '   ' + froz[2]
+        else:
+            line = df_atoms['atom_species'][i]+'   ' + '   '.join(map(str, pos))
         print(line)
         
-def convert_crystal_data(file_name, QE = False):
+def add_frozen(df_atoms, FROZEN_LAYERS):
+    """
+    Add a frozen command for specific atoms depending on FROZEN_LAYERS list
+    """
+    num_atoms = len(df_atoms)
+    if bool(FROZEN_LAYERS):
+        num_layers = len(FROZEN_LAYERS)
+        num_atoms_layer = num_atoms/num_layers
+        if round(num_atoms_layer%1, 5) != 0:
+            print('Incoherent frozen layers')
+            return
+        frozen_list = []
+        for i in FROZEN_LAYERS:
+            frozen_list = frozen_list + [int(i)]*int(num_atoms_layer)
+        
+    else:
+        frozen_list = [1] * num_atoms
+    
+    df_atoms['FX'], df_atoms['FY'], df_atoms['FZ'] = frozen_list, frozen_list, frozen_list
+    
+    return df_atoms        
+        
+        
+def convert_crystal_data(file_name, QE = False, FROZEN_LAYERS = False):
     """
     Takes the file name, converts to sorted and translated dataframe, and
     prints it in either VASP or QE format.
     """
     df_atoms = read_crystal_file(file_name)
+    df_atoms = add_frozen(df_atoms, FROZEN_LAYERS)
     df_atoms = sort_atoms(df_atoms)
     df_atoms = zero_xyz(df_atoms)
     lat = read_crystal_file_lat(file_name)
     if QE == False:
-        print_POSCAR(df_atoms,lat)
+        print_POSCAR(df_atoms,lat, FROZEN_LAYERS)
     else:
-        print_QE(df_atoms,lat)
+        print_QE(df_atoms,lat, FROZEN_LAYERS)
     return df_atoms
 
 #########################################################
