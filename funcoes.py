@@ -251,3 +251,60 @@ K_POINTS {automatic}
         file.write(scf_text)
 
     print(f'The content has been saved to {file_path_ss}.')
+    
+    
+############################################
+# Functions to calculate surface energies. #
+############################################
+
+def single_surface(E_bulk, E_slab, n_bulk, n_slab, A):
+    """Calculate the surface energy of facets by the single surface method
+    
+    Inputs:
+        E_bulk: Bulk total energy (Ry)
+        E_slab: Slab total energy (Ry)
+        n_bulk: Number of atoms in bulk
+        n_slab: Number of atoms in slab
+        A: Slab area (Å²)
+    Output:
+        E_s: surface energy of the facet (J/m²)
+    """
+
+    # Energy calculations
+    n = n_slab/n_bulk # proportion of bulks repetitions in the slab
+    E_s_wda = (E_slab - n*E_bulk)/(2*A) # Surface energy (Ry/A²)
+    
+    # Dimensional analysis
+    E_s = E_s_wda*217.98732373451776 # Surface energy (J/m²)
+    return E_s
+
+def cleavage_energy(E_bulk, E_frozen, E_A_relax, E_B_relax, n_slab, n_bulk, A):
+    """Calculate the surface energy of facets by the cleavage energy method
+    
+    Inputs:
+        E_bulk: Bulk total energy (Ry)
+        E_frozen: Slab with all atoms frozed total energy (Ry)
+        E_A_relax: Slab with B-atoms atoms frozed total energy (Ry)
+        E_B_relax: Slab with A-atoms atoms frozed total energy (Ry)
+        n_bulk: Number of atoms in bulk
+        n_slab: Number of atoms in slabs (same for the 3 slabs)
+        A: Slabs area (same for the 3 slabs) (Å²)
+    Output:
+        E_A: surface energy of the facet in termination A (J/m²)
+        E_B: surface energy of the facet in termination B (J/m²)
+    """
+    # Dimensional analysis
+    E_bulk_J = E_bulk*2.179874099e-18 # Bulk total energy (J)
+    E_frozen_J = E_frozen*2.179874099e-18 # Slab total energy (J)
+    E_A_relax_J = E_A_relax*2.179874099e-18 # Slab total energy (J)
+    E_B_relax_J = E_B_relax*2.179874099e-18 # Slab total energy (J)
+    A_m_2 = A*1e-20 # Slab area (m²)
+    
+    # Energy calculations
+    n = n_slab/n_bulk
+    E_relax_A = (E_frozen_J - n*E_bulk_J)/A_m_2 - (E_A_relax_J - n*E_bulk_J)/A_m_2 # Relaxation energy A (J/m²)
+    E_relax_B = (E_frozen_J - n*E_bulk_J)/A_m_2 - (E_B_relax_J - n*E_bulk_J)/A_m_2 # Relaxation energy B (J/m²)
+    E_cleave = (E_frozen_J - n*E_bulk_J)/(2*A_m_2) # Cleavage energy (J/m²) 
+    E_A = E_cleave - E_relax_A # Surface energy A (J/m²)
+    E_B = E_cleave - E_relax_B # Surface energy B (J/m²)
+    return E_A, E_B
