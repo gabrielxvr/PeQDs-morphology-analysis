@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 def read_QE_band(file_name):
     '''
@@ -145,10 +146,10 @@ def print_QE(df_atoms, lat, FROZEN_LAYERS):
     """
     # ADD VACUUM:
     lat[2][2] = str(float(lat[2][2]) + max(df_atoms['Z(ANGSTROM)']) + 15)
-    print("CELL_PARAMETERS (alat=  1.889725989)")
+    print("""CELL_PARAMETERS 'angstrom'""")
     for k in lat:
         print('   '+ '   '.join([format(float(b), '.15f')[:15] for b in k]))
-    print('ATOMIC_POSITIONS (crystal)')
+    print("""ATOMIC_POSITIONS (angstrom)""")
 
     for i in range(len(df_atoms['Z(ANGSTROM)'])):
         pos = [df_atoms['X(ANGSTROM)'][i],df_atoms['Y(ANGSTROM)'][i],df_atoms['Z(ANGSTROM)'][i]]
@@ -156,10 +157,13 @@ def print_QE(df_atoms, lat, FROZEN_LAYERS):
             pos[j] = format(pos[j], '.15f')
             pos[j] = pos[j][:15]
         froz = str(df_atoms['FX'][i]) + str(df_atoms['FY'][i]) + str(df_atoms['FZ'][i])
+        atom_specie = df_atoms['atom_species'][i]
+        if len(atom_specie) >= 2:
+            atom_specie = atom_specie[0] + atom_specie[1:].lower()
         if bool(FROZEN_LAYERS):
-            line = df_atoms['atom_species'][i]+'   ' + '   '.join(map(str, pos)) + '   ' + froz[0] + '   ' + froz[1] + '   ' + froz[2]
+            line = atom_specie+'   ' + '   '.join(map(str, pos)) + '   ' + froz[0] + '   ' + froz[1] + '   ' + froz[2]
         else:
-            line = df_atoms['atom_species'][i]+'   ' + '   '.join(map(str, pos))
+            line = atom_specie+'   ' + '   '.join(map(str, pos))
         print(line)
         
 def add_frozen(df_atoms, FROZEN_LAYERS):
@@ -328,18 +332,70 @@ def cleavage_energy(E_bulk, E_frozen, E_A_relax, E_B_relax, n_slab, n_bulk, A):
         E_A: surface energy of the facet in termination A (J/m²)
         E_B: surface energy of the facet in termination B (J/m²)
     """
-    # Dimensional analysis
-    E_bulk_J = E_bulk*2.179874099e-18 # Bulk total energy (J)
-    E_frozen_J = E_frozen*2.179874099e-18 # Slab total energy (J)
-    E_A_relax_J = E_A_relax*2.179874099e-18 # Slab total energy (J)
-    E_B_relax_J = E_B_relax*2.179874099e-18 # Slab total energy (J)
-    A_m_2 = A*1e-20 # Slab area (m²)
-    
     # Energy calculations
     n = n_slab/n_bulk
-    E_relax_A = (E_frozen_J - n*E_bulk_J)/A_m_2 - (E_A_relax_J - n*E_bulk_J)/A_m_2 # Relaxation energy A (J/m²)
-    E_relax_B = (E_frozen_J - n*E_bulk_J)/A_m_2 - (E_B_relax_J - n*E_bulk_J)/A_m_2 # Relaxation energy B (J/m²)
-    E_cleave = (E_frozen_J - n*E_bulk_J)/(2*A_m_2) # Cleavage energy (J/m²) 
-    E_A = E_cleave - E_relax_A # Surface energy A (J/m²)
-    E_B = E_cleave - E_relax_B # Surface energy B (J/m²)
+    E_relax_A = (E_frozen - n*E_bulk)/A - (E_A_relax - n*E_bulk)/A # Relaxation energy A (Ry/A²)
+    E_relax_B = (E_frozen - n*E_bulk)/A - (E_B_relax - n*E_bulk)/A # Relaxation energy B (Ry/A²)
+    E_cleave = (E_frozen - n*E_bulk)/(2*A) # Cleavage energy (Ry/A²) 
+    E_A_wda = E_cleave - E_relax_A # Surface energy A (Ry/A²)
+    E_B_wda = E_cleave - E_relax_B # Surface energy B (Ry/A²)
+    
+    # Dimensional analysis
+    E_A = E_A_wda*217.98732373451776 # Surface energy (J/m²)
+    E_B = E_B_wda*217.98732373451776 # Surface energy (J/m²)
+    
+    return E_A, E_B
+
+
+def r(x, A_matrix, b):
+    return (A_matrix @ x - b)**2
+
+def dr(x, A_matrix, b):
+    return A_matrix.T @ (A_matrix @ x - b)
+
+def newton_method(x_0, A_matrix, b, t, STOP):
+    x = x_0.copy()
+    while np.sum(r(x, A_matrix, b)) > STOP:
+        x = x - dr(x, A_matrix, b) * t
+        
+    return x
+
+def simultaneous_equations(E_bulk, E_frozen, E_relax, E_A_relax, E_B_relax, n_slab, n_bulk, A, t, STOP):
+    """Calculate the surface energy of facets by the simultaneous equations method
+    
+    Inputs:
+        E_bulk: Bulk total energy (Ry)
+        E_frozen: Slab with all atoms frozed total energy (Ry)
+        E_relax: Slab with all atoms optimized total energy (Ry)
+        E_A_relax: Slab with B-atoms atoms frozed total energy (Ry)
+        E_B_relax: Slab with A-atoms atoms frozed total energy (Ry)
+        n_bulk: Number of atoms in bulk
+        n_slab: Number of atoms in slabs (same for the 3 slabs)
+        A: Slabs area (same for the 3 slabs) (Å²)
+        t: Newton method step
+        STOP: Stop criteria for Newton method
+    Output:
+        E_A: surface energy of the facet in termination A (J/m²)
+        E_B: surface energy of the facet in termination B (J/m²)
+    """
+    # Energy calculations
+    n = n_slab/n_bulk
+    alpha_wda = (E_frozen - n*E_bulk)/A # total SE, fully fozen slab (Ry/A²)
+    beta_wda = (E_A_relax - n*E_bulk)/A # total SE, A relaxed and B frozen (Ry/A²)
+    gamma_wda = (E_B_relax - n*E_bulk)/A # total SE, B relaxed and A frozen (Ry/A²)
+    delta_wda = (E_relax - n*E_bulk)/A # total SE, both A and B surfaces relaxed (Ry/A²)
+    
+    # Dimensional analysis
+    alpha = alpha_wda*217.98732373451776 # total SE, fully fozen slab (J/m²)
+    beta = beta_wda*217.98732373451776 # total SE, A relaxed and B frozen (J/m²)
+    gamma = gamma_wda*217.98732373451776 # total SE, B relaxed and A frozen (J/m²)
+    delta = delta_wda*217.98732373451776 # total SE, both A and B surfaces relaxed (J/m²)
+    
+    # Energy calculations
+    A_matrix = np.array([[1, 1, 0, 0], [0, 1, 1, 0], [1, 0, 0, 1], [0, 0, 1, 1]])
+    b = np.array([alpha, beta, gamma, delta])
+    x_initial = np.array([alpha/2, alpha/2, delta/2, delta/2])
+    x_final = newton_method(x_initial, A_matrix, b, t, STOP)
+    E_A, E_B = x_final[2], x_final[3]
+    
     return E_A, E_B
