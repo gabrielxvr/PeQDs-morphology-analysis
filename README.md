@@ -4,6 +4,3 @@
 
 <p align="center"><img src="https://github.com/gabrielxvr/PeQDs-morphology-analysis/blob/main/CsPbBr3/banda_CsPbBr3.png"></p>
 
-<p align="center"><img src="https://github.com/gabrielxvr/PeQDs-morphology-analysis/blob/main/Cs3Bi2Br9/banda_Cs3Bi2Br9.png"></p>
-
-
